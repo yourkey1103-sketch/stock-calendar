@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>股票行事曆</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8eaf0;
+    --muted: #7b7f99;
+    --accent: #5b8fff;
+
+    --c-美股財報: #5b8fff;
+    --c-台股除息: #3ecf8e;
+    --c-台股重訊: #f5a623;
+    --c-台股法說: #bf7af0;
+    --c-總經:     #ff6b6b;
+    --c-美股:     #ff6b6b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  header {
+    max-width: 860px;
+    margin: 0 auto 2.5rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  header h1 span {
+    color: var(--accent);
+  }
+
+  #updated {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* 篩選按鈕 */
+  .filters {
+    max-width: 860px;
+    margin: 0 auto 1.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-btn {
+    padding: 5px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: 'Noto Sans TC', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .filter-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* 時間軸 */
+  .timeline {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .month-group { margin-bottom: 2rem; }
+
+  .month-label {
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0 0 0.8rem 60px;
+  }
+
+  .event-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+  .event-date {
+    flex-shrink: 0;
+    width: 44px;
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+
+  .event-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 6px;
+  }
+
+  .event-body { flex: 1; }
+
+  .event-title {
+    font-size: 0.92rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .event-detail {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 2px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .event-tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 5px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* 空狀態 */
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 3rem;
+    font-size: 0.9rem;
+  }
+
+  /* 今天高亮 */
+  .event-row.today .event-date { color: var(--accent); font-weight: 700; }
+  .event-row.today .event-title { color: #fff; }
+
+  /* 過去的事件變淡 */
+  .event-row.past { opacity: 0.4; }
+
+  /* 載入中 */
+  #loading {
+    text-align: center;
+    color: var(--muted);
+    padding: 4rem;
+    font-size: 0.9rem;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+  /* 分類顏色 */
+  .cat-美股財報 { background: rgba(91,143,255,0.15); color: #5b8fff; }
+  .cat-台股除息 { background: rgba(62,207,142,0.15); color: #3ecf8e; }
+  .cat-台股重訊 { background: rgba(245,166,35,0.15); color: #f5a623; }
+  .cat-台股法說 { background: rgba(191,122,240,0.15); color: #bf7af0; }
+  .cat-總經     { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+  .cat-美股     { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+
+  .dot-美股財報 { background: #5b8fff; }
+  .dot-台股除息 { background: #3ecf8e; }
+  .dot-台股重訊 { background: #f5a623; }
+  .dot-台股法說 { background: #bf7af0; }
+  .dot-總經     { background: #ff6b6b; }
+  .dot-美股     { background: #ff6b6b; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>股票<span>行事曆</span></h1>
+    <p id="updated">載入中...</p>
+  </div>
+  <div id="stats" style="font-size:0.82rem; color:var(--muted); text-align:right;"></div>
+</header>
+
+<div class="filters" id="filters">
+  <button class="filter-btn active" data-cat="全部">全部</button>
+  <button class="filter-btn" data-cat="美股財報">美股財報</button>
+  <button class="filter-btn" data-cat="台股除息">台股除息</button>
+  <button class="filter-btn" data-cat="台股法說">台股法說</button>
+  <button class="filter-btn" data-cat="台股重訊">台股重訊</button>
+  <button class="filter-btn" data-cat="總經">總經 / 四巫日</button>
+  <button class="filter-btn" data-cat="美股">美股事件</button>
+</div>
+
+<div class="timeline" id="timeline">
+  <div id="loading">載入資料中...</div>
+</div>
+
+<script>
+const DATA_URL = "./data/calendar.json";
+const todayStr = new Date().toISOString().slice(0,10);
+let allEvents = [];
+let activeFilter = "全部";
+
+function catMatch(cat) {
+  if (activeFilter === "全部") return true;
+  if (activeFilter === "總經 / 四巫日") return cat === "總經" || cat === "美股";
+  return cat === activeFilter;
+}
+
+function renderEvents() {
+  const filtered = allEvents.filter(e => catMatch(e.category));
+  const timeline = document.getElementById("timeline");
+  timeline.innerHTML = "";
+
+  if (filtered.length === 0) {
+    timeline.innerHTML = '<div class="empty">沒有符合的事件</div>';
+    return;
+  }
+
+  // 按月份分組
+  const groups = {};
+  filtered.forEach(e => {
+    const ym = e.date.slice(0,7);
+    if (!groups[ym]) groups[ym] = [];
+    groups[ym].push(e);
+  });
+
+  const monthNames = ["","1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+  Object.keys(groups).sort().forEach(ym => {
+    const [y, m] = ym.split("-");
+    const div = document.createElement("div");
+    div.className = "month-group";
+    div.innerHTML = `<div class="month-label">${y} · ${monthNames[parseInt(m)]}</div>`;
+
+    groups[ym].forEach(e => {
+      const isPast = e.date < todayStr;
+      const isToday = e.date === todayStr;
+      const dayStr = e.date.slice(8,10);
+      const dow = ["日","一","二","三","四","五","六"][new Date(e.date).getDay()];
+      const catClass = e.category.replace(/\//g,'_');
+
+      const row = document.createElement("div");
+      row.className = `event-row${isToday?" today":""}${isPast?" past":""}`;
+      row.innerHTML = `
+        <div class="event-date">${dayStr}<br><span style="font-size:0.68rem">(${dow})</span></div>
+        <div class="event-dot dot-${catClass}" style="background: var(--c-${catClass}, #888)"></div>
+        <div class="event-body">
+          <div class="event-title">${e.title}</div>
+          ${e.detail ? `<div class="event-detail">${e.detail}</div>` : ""}
+          <span class="event-tag cat-${catClass}">${e.category}</span>
+        </div>
+      `;
+      div.appendChild(row);
+    });
+
+    timeline.appendChild(div);
+  });
+}
+
+// 篩選按鈕
+document.getElementById("filters").addEventListener("click", e => {
+  if (!e.target.matches(".filter-btn")) return;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  activeFilter = e.target.dataset.cat;
+  renderEvents();
+});
+
+// 載入資料
+fetch(DATA_URL)
+  .then(r => r.json())
+  .then(data => {
+    allEvents = data.events || [];
+    document.getElementById("updated").textContent = `最後更新：${data.updated} ｜ 共 ${data.total} 筆`;
+    document.getElementById("stats").textContent =
+      `美股財報 ${allEvents.filter(e=>e.category==="美股財報").length} ｜ 台股除息 ${allEvents.filter(e=>e.category==="台股除息").length} ｜ 法說 ${allEvents.filter(e=>e.category==="台股法說").length}`;
+    renderEvents();
+  })
+  .catch(() => {
+    document.getElementById("loading").textContent = "⚠️ 無法載入資料，請確認 data/calendar.json 是否存在";
+  });
+</script>
+</body>
+</html>
