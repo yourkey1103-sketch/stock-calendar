@@ -1,1 +1,37 @@
+name: 每日更新股票行事曆
+
+on:
+  schedule:
+    # 台灣時間早上 7:30（UTC+8 → UTC 23:30 前一天）
+    - cron: "30 23 * * *"
+  workflow_dispatch:  # 手動也可觸發
+
+jobs:
+  fetch-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 安裝 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安裝套件
+        run: pip install requests beautifulsoup4
+
+      - name: 執行抓取腳本
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}  # 到 GitHub repo Settings > Secrets 設定
+        run: python fetch_calendar.py
+
+      - name: 提交更新後的資料
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/calendar.json
+          git diff --staged --quiet || git commit -m "自動更新：$(date '+%Y-%m-%d')"
+          git push
 
