@@ -5,26 +5,25 @@ on:
     - cron: "30 23 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   fetch-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: 取出程式碼
         uses: actions/checkout@v4
-
       - name: 安裝 Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: 安裝套件
         run: pip install requests beautifulsoup4
-
       - name: 執行抓取腳本
         env:
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         run: python fetch_calendar.py
-
       - name: 提交更新後的資料
         run: |
           git config user.name "github-actions[bot]"
